@@ -1,7 +1,13 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { 
+  getMeshManager, 
+  stopMeshManager, 
+  MeshNetworkManager,
+  BluetoothDevice as MeshDevice 
+} from '@/services/BluetoothMeshService';
 
 interface BluetoothDevice {
   id: string;
@@ -21,6 +27,7 @@ interface BluetoothContextType {
   disableBluetooth: () => void;
   startScanning: () => Promise<void>;
   stopScanning: () => void;
+  isUserNearby: (userId: string) => boolean;
 }
 
 const BluetoothContext = createContext<BluetoothContextType | undefined>(undefined);
@@ -30,6 +37,22 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [nearbyDevices, setNearbyDevices] = useState<BluetoothDevice[]>([]);
+  const [meshManager, setMeshManager] = useState<MeshNetworkManager | null>(null);
+
+  // Initialize mesh manager when user logs in
+  useEffect(() => {
+    if (user && isBluetoothEnabled) {
+      const manager = getMeshManager(user.id);
+      manager.start();
+      setMeshManager(manager);
+    }
+
+    return () => {
+      if (isBluetoothEnabled) {
+        stopMeshManager();
+      }
+    };
+  }, [user, isBluetoothEnabled]);
 
   const updateOnlineStatus = useCallback(async (isOnline: boolean) => {
     if (!user) return;
@@ -49,23 +72,19 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const enableBluetooth = async () => {
     try {
-      // Check if Web Bluetooth API is available
-      if ('bluetooth' in navigator) {
-        setIsBluetoothEnabled(true);
-        await updateOnlineStatus(true);
-        toast({
-          title: "Bluetooth activé",
-          description: "Vous êtes maintenant visible pour les autres utilisateurs à proximité.",
-        });
-      } else {
-        // Fallback for browsers without Web Bluetooth
-        setIsBluetoothEnabled(true);
-        await updateOnlineStatus(true);
-        toast({
-          title: "Mode en ligne activé",
-          description: "Vous êtes maintenant visible pour les autres utilisateurs.",
-        });
+      setIsBluetoothEnabled(true);
+      await updateOnlineStatus(true);
+      
+      if (user) {
+        const manager = getMeshManager(user.id);
+        await manager.start();
+        setMeshManager(manager);
       }
+      
+      toast({
+        title: "Bluetooth activé",
+        description: "Vous êtes maintenant visible pour les autres utilisateurs à proximité.",
+      });
     } catch (error) {
       toast({
         title: "Erreur",
@@ -75,11 +94,14 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const disableBluetooth = () => {
+  const disableBluetooth = async () => {
     setIsBluetoothEnabled(false);
     setIsScanning(false);
     setNearbyDevices([]);
-    updateOnlineStatus(false);
+    await updateOnlineStatus(false);
+    await stopMeshManager();
+    setMeshManager(null);
+    
     toast({
       title: "Bluetooth désactivé",
       description: "Vous n'êtes plus visible pour les autres utilisateurs.",
@@ -92,36 +114,41 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsScanning(true);
     
     try {
-      // Fetch online users from database (simulating Bluetooth discovery)
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('is_online', true)
-        .neq('user_id', user.id);
+      // Use mesh manager to scan
+      const manager = meshManager || getMeshManager(user.id);
+      const discoveredDevices = await manager.scanForDevices();
 
-      if (error) throw error;
+      // Enrich with profile data
+      const enrichedDevices: BluetoothDevice[] = [];
+      
+      for (const device of discoveredDevices) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', device.userId)
+          .maybeSingle();
 
-      const devices: BluetoothDevice[] = (profiles || []).map((profile) => ({
-        id: profile.bluetooth_id || profile.id,
-        userId: profile.user_id,
-        username: profile.username,
-        displayName: profile.display_name || profile.username,
-        avatarUrl: profile.avatar_url,
-        signalStrength: Math.floor(Math.random() * 100) + 1,
-        isNearby: Math.random() > 0.3,
-      }));
-
-      setNearbyDevices(devices);
-
-      // Log discoveries
-      for (const device of devices) {
-        await supabase.from('device_discoveries').insert({
-          discoverer_id: user.id,
-          discovered_user_id: device.userId,
-          bluetooth_signal_strength: device.signalStrength,
-        });
+        if (profile) {
+          enrichedDevices.push({
+            id: device.id,
+            userId: device.userId,
+            username: profile.username,
+            displayName: profile.display_name || profile.username,
+            avatarUrl: profile.avatar_url,
+            signalStrength: device.signalStrength,
+            isNearby: device.isNearby,
+          });
+        }
       }
 
+      setNearbyDevices(enrichedDevices);
+      
+      if (enrichedDevices.length > 0) {
+        toast({
+          title: "Scan terminé",
+          description: `${enrichedDevices.length} appareil(s) trouvé(s) à proximité.`,
+        });
+      }
     } catch (error) {
       console.error('Erreur lors du scan:', error);
       toast({
@@ -138,6 +165,13 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsScanning(false);
   };
 
+  const isUserNearby = (userId: string): boolean => {
+    if (meshManager) {
+      return meshManager.isUserNearby(userId);
+    }
+    return nearbyDevices.some(d => d.userId === userId && d.isNearby);
+  };
+
   return (
     <BluetoothContext.Provider
       value={{
@@ -148,6 +182,7 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         disableBluetooth,
         startScanning,
         stopScanning,
+        isUserNearby,
       }}
     >
       {children}
