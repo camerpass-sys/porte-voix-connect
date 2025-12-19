@@ -6,12 +6,15 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, username: string, displayName: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (username: string, password: string, displayName: string) => Promise<{ error: Error | null }>;
+  signIn: (username: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Convert username to fake email for Supabase Auth
+const usernameToEmail = (username: string) => `${username.toLowerCase().trim()}@connktus.local`;
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -38,8 +41,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, username: string, displayName: string) => {
+  const signUp = async (username: string, password: string, displayName: string) => {
+    const email = usernameToEmail(username);
     const redirectUrl = `${window.location.origin}/`;
+    
+    // Check if username is already taken
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', username.toLowerCase().trim())
+      .maybeSingle();
+    
+    if (existingProfile) {
+      return { error: new Error("Ce nom d'utilisateur est déjà pris") };
+    }
     
     const { error } = await supabase.auth.signUp({
       email,
@@ -47,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       options: {
         emailRedirectTo: redirectUrl,
         data: {
-          username,
+          username: username.toLowerCase().trim(),
           display_name: displayName,
         }
       }
@@ -56,7 +71,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error as Error | null };
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (username: string, password: string) => {
+    const email = usernameToEmail(username);
+    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -66,6 +83,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    // Update online status before signing out
+    if (user) {
+      await supabase
+        .from('profiles')
+        .update({ is_online: false, last_seen: new Date().toISOString() })
+        .eq('user_id', user.id);
+    }
     await supabase.auth.signOut();
   };
 

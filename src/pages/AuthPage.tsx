@@ -5,18 +5,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, User, Lock, UserPlus } from 'lucide-react';
 import { z } from 'zod';
 import logoImage from '@/assets/logo.jpg';
 
 const loginSchema = z.object({
-  email: z.string().email('Adresse email invalide'),
+  username: z.string()
+    .min(3, "Le nom d'utilisateur doit contenir au moins 3 caractères")
+    .max(20, "Le nom d'utilisateur ne peut pas dépasser 20 caractères")
+    .regex(/^[a-zA-Z0-9_]+$/, "Seuls les lettres, chiffres et underscores sont autorisés"),
   password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
 });
 
 const signupSchema = loginSchema.extend({
-  username: z.string().min(3, "Le nom d'utilisateur doit contenir au moins 3 caractères"),
-  displayName: z.string().min(2, 'Le nom doit contenir au moins 2 caractères'),
+  displayName: z.string()
+    .min(2, 'Le nom doit contenir au moins 2 caractères')
+    .max(50, 'Le nom ne peut pas dépasser 50 caractères'),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Les mots de passe ne correspondent pas",
+  path: ["confirmPassword"],
 });
 
 export const AuthPage: React.FC = () => {
@@ -27,10 +35,10 @@ export const AuthPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
     username: '',
+    password: '',
     displayName: '',
+    confirmPassword: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -63,12 +71,12 @@ export const AuthPage: React.FC = () => {
       }
 
       if (isLogin) {
-        const { error } = await signIn(formData.email, formData.password);
+        const { error } = await signIn(formData.username, formData.password);
         if (error) {
           toast({
             title: 'Erreur de connexion',
             description: error.message === 'Invalid login credentials' 
-              ? 'Email ou mot de passe incorrect' 
+              ? 'Nom d\'utilisateur ou mot de passe incorrect' 
               : error.message,
             variant: 'destructive',
           });
@@ -81,25 +89,16 @@ export const AuthPage: React.FC = () => {
         }
       } else {
         const { error } = await signUp(
-          formData.email, 
-          formData.password, 
           formData.username, 
+          formData.password, 
           formData.displayName
         );
         if (error) {
-          if (error.message.includes('already registered')) {
-            toast({
-              title: 'Erreur',
-              description: 'Cette adresse email est déjà utilisée.',
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: "Erreur d'inscription",
-              description: error.message,
-              variant: 'destructive',
-            });
-          }
+          toast({
+            title: "Erreur d'inscription",
+            description: error.message,
+            variant: 'destructive',
+          });
         } else {
           toast({
             title: 'Inscription réussie',
@@ -122,83 +121,74 @@ export const AuthPage: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom">
       {/* Header with gradient */}
-      <div className="flex-shrink-0 pt-8 pb-6 px-6 text-center" style={{ background: 'var(--gradient-primary)' }}>
-        <div className="w-24 h-24 mx-auto mb-4 rounded-2xl overflow-hidden shadow-lg bg-white">
+      <div className="flex-shrink-0 pt-10 pb-8 px-6 text-center" style={{ background: 'var(--gradient-primary)' }}>
+        <div className="w-28 h-28 mx-auto mb-4 rounded-2xl overflow-hidden shadow-xl bg-white p-2">
           <img 
             src={logoImage} 
             alt="ConnKtus" 
             className="w-full h-full object-contain"
           />
         </div>
-        <h1 className="text-2xl font-bold text-primary-foreground">ConnKtus</h1>
-        <p className="text-primary-foreground/80 text-sm mt-1">
-          Connectez-vous via Bluetooth
+        <h1 className="text-3xl font-bold text-primary-foreground">ConnKtus</h1>
+        <p className="text-primary-foreground/80 text-sm mt-2">
+          Messagerie Bluetooth • Sans Internet
         </p>
       </div>
 
       {/* Form */}
-      <div className="flex-1 px-6 py-8 -mt-4 bg-background rounded-t-3xl">
+      <div className="flex-1 px-6 py-8 -mt-6 bg-background rounded-t-3xl">
         <div className="max-w-sm mx-auto">
           <h2 className="text-xl font-semibold mb-6 text-center">
             {isLogin ? 'Connexion' : 'Créer un compte'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="username">Nom d'utilisateur</Label>
-                  <Input
-                    id="username"
-                    name="username"
-                    type="text"
-                    value={formData.username}
-                    onChange={handleChange}
-                    placeholder="@monpseudo"
-                    className="rounded-xl"
-                  />
-                  {errors.username && (
-                    <p className="text-xs text-destructive">{errors.username}</p>
-                  )}
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="username">Nom d'utilisateur</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="username"
+                  name="username"
+                  type="text"
+                  value={formData.username}
+                  onChange={handleChange}
+                  placeholder="votre_pseudo"
+                  className="rounded-xl pl-10"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                />
+              </div>
+              {errors.username && (
+                <p className="text-xs text-destructive">{errors.username}</p>
+              )}
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="displayName">Nom complet</Label>
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="displayName">Nom affiché</Label>
+                <div className="relative">
+                  <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="displayName"
                     name="displayName"
                     type="text"
                     value={formData.displayName}
                     onChange={handleChange}
-                    placeholder="Votre nom"
-                    className="rounded-xl"
+                    placeholder="Votre nom complet"
+                    className="rounded-xl pl-10"
                   />
-                  {errors.displayName && (
-                    <p className="text-xs text-destructive">{errors.displayName}</p>
-                  )}
                 </div>
-              </>
+                {errors.displayName && (
+                  <p className="text-xs text-destructive">{errors.displayName}</p>
+                )}
+              </div>
             )}
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Adresse email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="vous@exemple.com"
-                className="rounded-xl"
-              />
-              {errors.email && (
-                <p className="text-xs text-destructive">{errors.email}</p>
-              )}
-            </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">Mot de passe</Label>
               <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   id="password"
                   name="password"
@@ -206,7 +196,7 @@ export const AuthPage: React.FC = () => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="••••••••"
-                  className="rounded-xl pr-10"
+                  className="rounded-xl pl-10 pr-10"
                 />
                 <button
                   type="button"
@@ -221,9 +211,30 @@ export const AuthPage: React.FC = () => {
               )}
             </div>
 
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    className="rounded-xl pl-10"
+                  />
+                </div>
+                {errors.confirmPassword && (
+                  <p className="text-xs text-destructive">{errors.confirmPassword}</p>
+                )}
+              </div>
+            )}
+
             <Button
               type="submit"
-              className="w-full rounded-xl h-12 text-base font-medium"
+              className="w-full rounded-xl h-12 text-base font-medium mt-6"
               disabled={loading}
             >
               {loading ? (
@@ -242,6 +253,12 @@ export const AuthPage: React.FC = () => {
               onClick={() => {
                 setIsLogin(!isLogin);
                 setErrors({});
+                setFormData({
+                  username: '',
+                  password: '',
+                  displayName: '',
+                  confirmPassword: '',
+                });
               }}
               className="text-sm text-primary hover:underline"
             >
@@ -250,6 +267,13 @@ export const AuthPage: React.FC = () => {
                 : 'Déjà un compte ? Se connecter'
               }
             </button>
+          </div>
+
+          {/* App info */}
+          <div className="mt-8 pt-6 border-t border-border text-center">
+            <p className="text-xs text-muted-foreground">
+              ConnKtus utilise le Bluetooth pour vous connecter avec les personnes à proximité, sans avoir besoin d'internet.
+            </p>
           </div>
         </div>
       </div>
