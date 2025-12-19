@@ -109,42 +109,16 @@ export const useConversations = () => {
     if (!user) return null;
 
     try {
-      // Check if conversation already exists
-      const { data: existingParticipants } = await supabase
-        .from('conversation_participants')
-        .select('conversation_id')
-        .eq('user_id', user.id);
+      // Use the database function to create conversation with proper permissions
+      const { data, error } = await supabase
+        .rpc('create_conversation_with_participant', {
+          other_user_id: otherUserId
+        });
 
-      for (const p of existingParticipants || []) {
-        const { data: otherP } = await supabase
-          .from('conversation_participants')
-          .select('user_id')
-          .eq('conversation_id', p.conversation_id)
-          .eq('user_id', otherUserId)
-          .maybeSingle();
-
-        if (otherP) {
-          return p.conversation_id;
-        }
-      }
-
-      // Create new conversation
-      const { data: newConv, error: convError } = await supabase
-        .from('conversations')
-        .insert({})
-        .select()
-        .single();
-
-      if (convError) throw convError;
-
-      // Add participants
-      await supabase.from('conversation_participants').insert([
-        { conversation_id: newConv.id, user_id: user.id },
-        { conversation_id: newConv.id, user_id: otherUserId },
-      ]);
+      if (error) throw error;
 
       await fetchConversations();
-      return newConv.id;
+      return data as string;
     } catch (error) {
       console.error('Erreur lors de la création de la conversation:', error);
       return null;
