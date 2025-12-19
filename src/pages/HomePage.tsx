@@ -26,7 +26,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenChat }) => {
   const { signOut } = useAuth();
   const { profile } = useProfile();
   const { conversations, loading, createConversation, fetchConversations } = useConversations();
-  const { isBluetoothEnabled, nearbyDevices } = useBluetooth();
+  const { isBluetoothEnabled, nearbyDevices, savedContacts } = useBluetooth();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('discussions');
 
@@ -68,7 +68,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenChat }) => {
     navigate('/auth');
   };
 
-  // Get contacts from nearby devices and conversations
+  // Get contacts from nearby devices, saved contacts, and conversations
   const contacts = [
     ...nearbyDevices.map(d => ({
       id: d.userId,
@@ -78,8 +78,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenChat }) => {
       isOnline: true,
       isNearby: d.isNearby,
     })),
+    ...savedContacts
+      .filter(c => !nearbyDevices.some(d => d.userId === c.userId))
+      .map(c => ({
+        id: c.userId,
+        name: c.displayName,
+        username: c.username,
+        avatar: c.avatarUrl,
+        isOnline: false,
+        isNearby: false,
+      })),
     ...conversations
-      .filter(c => !nearbyDevices.some(d => d.userId === c.participantId))
+      .filter(c => !nearbyDevices.some(d => d.userId === c.participantId) && 
+                   !savedContacts.some(s => s.userId === c.participantId))
       .map(c => ({
         id: c.participantId,
         name: c.participantName,
