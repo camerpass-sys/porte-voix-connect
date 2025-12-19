@@ -14,7 +14,222 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      contacts: {
+        Row: {
+          contact_user_id: string
+          created_at: string
+          id: string
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          contact_user_id: string
+          created_at?: string
+          id?: string
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          contact_user_id?: string
+          created_at?: string
+          id?: string
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      conversation_participants: {
+        Row: {
+          conversation_id: string
+          id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_participants_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      device_discoveries: {
+        Row: {
+          bluetooth_signal_strength: number | null
+          discovered_at: string
+          discovered_user_id: string
+          discoverer_id: string
+          id: string
+        }
+        Insert: {
+          bluetooth_signal_strength?: number | null
+          discovered_at?: string
+          discovered_user_id: string
+          discoverer_id: string
+          id?: string
+        }
+        Update: {
+          bluetooth_signal_strength?: number | null
+          discovered_at?: string
+          discovered_user_id?: string
+          discoverer_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      message_receipts: {
+        Row: {
+          id: string
+          message_id: string
+          status: string
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          status: string
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          status?: string
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_receipts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          delivered_at: string | null
+          encrypted_content: string | null
+          id: string
+          message_type: string | null
+          relay_path: Json | null
+          seen_at: string | null
+          sender_id: string
+          status: string | null
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          delivered_at?: string | null
+          encrypted_content?: string | null
+          id?: string
+          message_type?: string | null
+          relay_path?: Json | null
+          seen_at?: string | null
+          sender_id: string
+          status?: string | null
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          encrypted_content?: string | null
+          id?: string
+          message_type?: string | null
+          relay_path?: Json | null
+          seen_at?: string | null
+          sender_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bluetooth_id: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          is_online: boolean | null
+          last_seen: string | null
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bluetooth_id?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_online?: boolean | null
+          last_seen?: string | null
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bluetooth_id?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_online?: boolean | null
+          last_seen?: string | null
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
