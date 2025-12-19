@@ -2,95 +2,126 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* ConnKtus Design System - Blue & White Theme */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Primary Blue Palette - inspired by ConnKtus logo */
+    --connktus-blue: 210 100% 45%;
+    --connktus-blue-light: 210 100% 55%;
+    --connktus-blue-dark: 210 100% 35%;
+    --connktus-accent: 195 100% 50%;
+    
+    /* Core Colors */
+    --background: 210 20% 98%;
+    --foreground: 210 50% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 210 50% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 210 50% 10%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 210 100% 45%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 30% 94%;
+    --secondary-foreground: 210 50% 20%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 210 20% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 195 100% 50%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 210 20% 90%;
+    --input: 210 20% 90%;
+    --ring: 210 100% 45%;
 
-    --radius: 0.5rem;
+    --radius: 1rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Chat Bubble Colors */
+    --bubble-sent: 210 100% 45%;
+    --bubble-sent-foreground: 0 0% 100%;
+    --bubble-received: 210 20% 96%;
+    --bubble-received-foreground: 210 50% 10%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Status Colors */
+    --online: 142 70% 45%;
+    --offline: 210 20% 70%;
+    --away: 45 100% 50%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Message Status */
+    --status-sent: 210 20% 60%;
+    --status-delivered: 210 100% 45%;
+    --status-seen: 195 100% 50%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(210 100% 45%), hsl(195 100% 50%));
+    --gradient-header: linear-gradient(180deg, hsl(210 100% 45%), hsl(210 100% 50%));
+    --gradient-bubble: linear-gradient(135deg, hsl(210 100% 48%), hsl(210 100% 42%));
 
-    --sidebar-accent: 240 4.8% 95.9%;
+    /* Shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(210 50% 20% / 0.1);
+    --shadow-medium: 0 4px 16px -4px hsl(210 50% 20% / 0.15);
+    --shadow-strong: 0 8px 32px -8px hsl(210 50% 20% / 0.2);
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 210 50% 20%;
+    --sidebar-primary: 210 100% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 96%;
+    --sidebar-accent-foreground: 210 50% 20%;
+    --sidebar-border: 210 20% 92%;
+    --sidebar-ring: 210 100% 45%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 210 30% 8%;
+    --foreground: 210 20% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 210 30% 12%;
+    --card-foreground: 210 20% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 210 30% 12%;
+    --popover-foreground: 210 20% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 210 100% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 210 30% 18%;
+    --secondary-foreground: 210 20% 95%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 210 30% 15%;
+    --muted-foreground: 210 20% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 195 100% 50%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border: 210 30% 20%;
+    --input: 210 30% 20%;
+    --ring: 210 100% 55%;
+
+    --bubble-sent: 210 100% 50%;
+    --bubble-sent-foreground: 0 0% 100%;
+    --bubble-received: 210 30% 20%;
+    --bubble-received-foreground: 210 20% 95%;
+
+    --sidebar-background: 210 30% 10%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 210 100% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 210 30% 18%;
+    --sidebar-accent-foreground: 210 20% 90%;
+    --sidebar-border: 210 30% 18%;
+    --sidebar-ring: 210 100% 55%;
   }
 }
 
@@ -100,6 +131,151 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Custom scrollbar for chat */
+  .chat-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .chat-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .chat-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+
+  .chat-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+@layer components {
+  /* Message bubbles */
+  .message-bubble-sent {
+    @apply rounded-2xl rounded-br-md px-4 py-2;
+    background: var(--gradient-bubble);
+    color: hsl(var(--bubble-sent-foreground));
+    box-shadow: var(--shadow-soft);
+  }
+
+  .message-bubble-received {
+    @apply rounded-2xl rounded-bl-md px-4 py-2;
+    background: hsl(var(--bubble-received));
+    color: hsl(var(--bubble-received-foreground));
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* Chat header */
+  .chat-header {
+    background: var(--gradient-header);
+    @apply text-primary-foreground;
+  }
+
+  /* Status indicators */
+  .status-online {
+    @apply w-3 h-3 rounded-full;
+    background: hsl(var(--online));
+    box-shadow: 0 0 8px hsl(var(--online) / 0.5);
+  }
+
+  .status-offline {
+    @apply w-3 h-3 rounded-full;
+    background: hsl(var(--offline));
+  }
+
+  /* Bluetooth pulse animation */
+  .bluetooth-pulse {
+    animation: bluetooth-pulse 2s infinite;
+  }
+
+  @keyframes bluetooth-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 0.7;
+    }
+  }
+
+  /* Scanning animation */
+  .scanning-wave {
+    animation: scanning-wave 1.5s ease-out infinite;
+  }
+
+  @keyframes scanning-wave {
+    0% {
+      transform: scale(0.8);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(2.5);
+      opacity: 0;
+    }
+  }
+
+  /* Message status animation */
+  .check-animate {
+    animation: check-appear 0.3s ease-out;
+  }
+
+  @keyframes check-appear {
+    0% {
+      transform: scale(0);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.2);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Floating action button */
+  .fab {
+    @apply fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center;
+    background: var(--gradient-primary);
+    box-shadow: var(--shadow-strong);
+    @apply text-primary-foreground transition-transform hover:scale-110 active:scale-95;
+  }
+
+  /* Contact card */
+  .contact-card {
+    @apply flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer;
+    @apply hover:bg-secondary/50 active:bg-secondary;
+  }
+
+  /* Input styling */
+  .message-input {
+    @apply rounded-full border-none px-4 py-3;
+    background: hsl(var(--muted));
+    @apply focus:ring-2 focus:ring-primary/30 focus:outline-none;
+  }
+}
+
+@layer utilities {
+  /* Safe area padding for mobile */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  /* Text gradient */
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }
