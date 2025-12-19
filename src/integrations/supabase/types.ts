@@ -235,6 +235,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_conversation_with_participant: {
+        Args: { other_user_id: string }
+        Returns: string
+      }
       get_profile_by_username: {
         Args: { p_username: string }
         Returns: {
