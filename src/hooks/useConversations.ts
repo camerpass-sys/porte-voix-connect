@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getOfflineMessages, getSavedContacts } from '@/services/OfflineMessageService';
 
 export interface Conversation {
   id: string;
@@ -14,6 +14,24 @@ export interface Conversation {
   unreadCount: number;
 }
 
+// Storage key for offline conversations
+const CONVERSATIONS_KEY = 'connktus_conversations';
+
+// Get stored conversations from localStorage
+const getStoredConversations = (): Conversation[] => {
+  try {
+    const stored = localStorage.getItem(CONVERSATIONS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+// Save conversations to localStorage
+const saveConversations = (conversations: Conversation[]): void => {
+  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations));
+};
+
 export const useConversations = () => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -23,72 +41,65 @@ export const useConversations = () => {
     if (!user) return;
 
     try {
-      const { data: participants, error } = await supabase
-        .from('conversation_participants')
-        .select(`
-          conversation_id,
-          conversations!inner(id, updated_at)
-        `)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
+      // Get messages from local storage
+      const messages = getOfflineMessages();
+      const contacts = getSavedContacts();
+      
+      // Group messages by conversation
+      const conversationMap = new Map<string, {
+        participantId: string;
+        messages: typeof messages;
+      }>();
+      
+      messages.forEach(msg => {
+        if (!conversationMap.has(msg.conversationId)) {
+          // Determine participant (the other person)
+          const participantId = msg.senderId === user.id ? msg.recipientId : msg.senderId;
+          conversationMap.set(msg.conversationId, {
+            participantId,
+            messages: []
+          });
+        }
+        conversationMap.get(msg.conversationId)!.messages.push(msg);
+      });
+      
+      // Build conversation list from local data
       const conversationList: Conversation[] = [];
-
-      for (const p of participants || []) {
-        const convId = p.conversation_id;
-
-        // Get other participant
-        const { data: otherParticipants } = await supabase
-          .from('conversation_participants')
-          .select('user_id')
-          .eq('conversation_id', convId)
-          .neq('user_id', user.id)
-          .limit(1);
-
-        if (!otherParticipants || otherParticipants.length === 0) continue;
-
-        const otherUserId = otherParticipants[0].user_id;
-
-        // Get profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', otherUserId)
-          .maybeSingle();
-
-        if (!profile) continue;
-
-        // Get last message
-        const { data: messages } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('conversation_id', convId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        const lastMsg = messages?.[0];
-
-        // Count unread messages
-        const { count } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('conversation_id', convId)
-          .neq('sender_id', user.id)
-          .neq('status', 'seen');
-
+      
+      conversationMap.forEach((data, convId) => {
+        // Find contact info
+        const contact = contacts.find(c => c.userId === data.participantId);
+        
+        // Sort messages by date
+        data.messages.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        
+        const lastMsg = data.messages[0];
+        const unreadCount = data.messages.filter(m => 
+          m.senderId !== user.id && !m.synced
+        ).length;
+        
         conversationList.push({
           id: convId,
-          participantId: otherUserId,
-          participantName: profile.display_name || profile.username,
-          participantUsername: profile.username,
-          participantAvatar: profile.avatar_url,
-          isOnline: profile.is_online || false,
+          participantId: data.participantId || '',
+          participantName: contact?.displayName || 'Utilisateur',
+          participantUsername: contact?.username || 'inconnu',
+          participantAvatar: contact?.avatarUrl,
+          isOnline: false, // Will be determined by Bluetooth proximity
           lastMessage: lastMsg?.content,
-          lastMessageTime: lastMsg?.created_at,
-          unreadCount: count || 0,
+          lastMessageTime: lastMsg?.createdAt,
+          unreadCount,
         });
-      }
+      });
+      
+      // Also load stored conversations that might not have messages yet
+      const storedConvs = getStoredConversations();
+      storedConvs.forEach(stored => {
+        if (!conversationList.some(c => c.id === stored.id)) {
+          conversationList.push(stored);
+        }
+      });
 
       // Sort by last message time
       conversationList.sort((a, b) => {
@@ -98,8 +109,9 @@ export const useConversations = () => {
       });
 
       setConversations(conversationList);
+      saveConversations(conversationList);
     } catch (error) {
-      console.error('Erreur lors du chargement des conversations:', error);
+      console.error('[Conversations] Erreur:', error);
     } finally {
       setLoading(false);
     }
@@ -109,44 +121,46 @@ export const useConversations = () => {
     if (!user) return null;
 
     try {
-      // Use the database function to create conversation with proper permissions
-      const { data, error } = await supabase
-        .rpc('create_conversation_with_participant', {
-          other_user_id: otherUserId
-        });
-
-      if (error) throw error;
-
-      await fetchConversations();
-      return data as string;
+      // Check if conversation already exists
+      const existing = conversations.find(c => c.participantId === otherUserId);
+      if (existing) {
+        return existing.id;
+      }
+      
+      // Create new conversation locally
+      const conversationId = crypto.randomUUID();
+      const contacts = getSavedContacts();
+      const contact = contacts.find(c => c.userId === otherUserId);
+      
+      const newConversation: Conversation = {
+        id: conversationId,
+        participantId: otherUserId,
+        participantName: contact?.displayName || 'Utilisateur',
+        participantUsername: contact?.username || 'inconnu',
+        participantAvatar: contact?.avatarUrl,
+        isOnline: false,
+        unreadCount: 0,
+      };
+      
+      const updatedConversations = [newConversation, ...conversations];
+      setConversations(updatedConversations);
+      saveConversations(updatedConversations);
+      
+      return conversationId;
     } catch (error) {
-      console.error('Erreur lors de la création de la conversation:', error);
+      console.error('[Conversations] Erreur création:', error);
       return null;
     }
   };
 
+  // Fetch on mount and periodically refresh
   useEffect(() => {
     fetchConversations();
-
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel('conversations-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-        },
-        () => {
-          fetchConversations();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    
+    // Refresh every 3 seconds to pick up new messages
+    const interval = setInterval(fetchConversations, 3000);
+    
+    return () => clearInterval(interval);
   }, [fetchConversations]);
 
   return { conversations, loading, fetchConversations, createConversation };

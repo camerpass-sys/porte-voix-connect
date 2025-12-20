@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { 
   getMeshManager, 
   stopMeshManager, 
-  MeshNetworkManager
+  MeshNetworkManager,
+  getPersistedNearbyDevices,
+  getCarriedMessages
 } from '@/services/BluetoothMeshService';
 import { saveContactLocally, getSavedContacts, SavedContact } from '@/services/OfflineMessageService';
 
@@ -17,6 +18,7 @@ interface BluetoothDevice {
   avatarUrl?: string;
   signalStrength: number;
   isNearby: boolean;
+  bluetoothId?: string;
 }
 
 interface BluetoothContextType {
@@ -24,11 +26,13 @@ interface BluetoothContextType {
   isScanning: boolean;
   nearbyDevices: BluetoothDevice[];
   savedContacts: SavedContact[];
+  carriedMessagesCount: number;
   enableBluetooth: () => Promise<void>;
   disableBluetooth: () => void;
   startScanning: () => Promise<void>;
   stopScanning: () => void;
   isUserNearby: (userId: string) => boolean;
+  getMyBluetoothId: () => string;
 }
 
 const BluetoothContext = createContext<BluetoothContextType | undefined>(undefined);
@@ -39,15 +43,32 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isScanning, setIsScanning] = useState(false);
   const [nearbyDevices, setNearbyDevices] = useState<BluetoothDevice[]>([]);
   const [savedContacts, setSavedContacts] = useState<SavedContact[]>([]);
+  const [carriedMessagesCount, setCarriedMessagesCount] = useState(0);
   const meshManagerRef = useRef<MeshNetworkManager | null>(null);
   const autoScanIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load saved contacts on mount
+  // Load saved contacts and persisted devices on mount
   useEffect(() => {
     setSavedContacts(getSavedContacts());
+    setCarriedMessagesCount(getCarriedMessages().length);
+    
+    // Load persisted nearby devices
+    const persisted = getPersistedNearbyDevices();
+    if (persisted.length > 0) {
+      const devices: BluetoothDevice[] = persisted.map(d => ({
+        id: d.id,
+        userId: d.userId,
+        username: d.name.toLowerCase().replace(/\s+/g, '_'),
+        displayName: d.name,
+        signalStrength: d.signalStrength,
+        isNearby: false, // Will be updated on scan
+        bluetoothId: d.bluetoothId
+      }));
+      setNearbyDevices(devices);
+    }
   }, []);
 
-  // Auto-enable Bluetooth and start scanning when user is authenticated
+  // Auto-enable Bluetooth when user is authenticated
   useEffect(() => {
     if (user) {
       const initBluetooth = async () => {
@@ -59,8 +80,11 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           // Initial scan
           await performScan();
 
-          // Auto-scan every 15 seconds
-          autoScanIntervalRef.current = setInterval(performScan, 15000);
+          // Auto-scan every 5 seconds for Bluetooth-only mode
+          autoScanIntervalRef.current = setInterval(() => {
+            performScan();
+            setCarriedMessagesCount(getCarriedMessages().length);
+          }, 5000);
         } catch (error) {
           console.error('[Bluetooth] Erreur initialisation:', error);
         }
@@ -72,7 +96,7 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setIsScanning(true);
         try {
           const devices = await meshManagerRef.current.scanForDevices();
-          await enrichDevicesWithProfiles(devices);
+          enrichDevicesFromLocal(devices);
         } finally {
           setIsScanning(false);
         }
@@ -88,73 +112,32 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [user]);
 
-  // Enrich devices with profile information
-  const enrichDevicesWithProfiles = async (devices: { id: string; name: string; userId: string; signalStrength: number; isNearby: boolean }[]) => {
-    if (devices.length === 0) {
-      return;
-    }
-
-    try {
-      const userIds = devices.map(d => d.userId);
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('user_id', userIds);
-
-      if (error) throw error;
-
-      const enrichedDevices: BluetoothDevice[] = devices.map(device => {
-        const profile = profiles?.find(p => p.user_id === device.userId);
-        
-        const enriched: BluetoothDevice = {
-          id: device.id,
-          userId: device.userId,
-          username: profile?.username || 'inconnu',
-          displayName: profile?.display_name || profile?.username || 'Utilisateur',
-          avatarUrl: profile?.avatar_url || undefined,
-          signalStrength: device.signalStrength,
-          isNearby: device.isNearby,
-        };
-
-        // Save contact locally for offline access
-        saveContactLocally({
-          userId: enriched.userId,
-          username: enriched.username,
-          displayName: enriched.displayName,
-          avatarUrl: enriched.avatarUrl,
-          lastSeen: new Date().toISOString(),
-        });
-
-        return enriched;
-      });
-
-      setNearbyDevices(enrichedDevices);
-      setSavedContacts(getSavedContacts());
-    } catch (error) {
-      console.error('[Bluetooth] Erreur enrichissement profils:', error);
-    }
-  };
-
-  const updateOnlineStatus = useCallback(async (isOnline: boolean) => {
-    if (!user) return;
+  // Enrich devices from local storage (no internet required)
+  const enrichDevicesFromLocal = (devices: { id: string; name: string; userId: string; signalStrength: number; isNearby: boolean; bluetoothId?: string }[]) => {
+    const contacts = getSavedContacts();
     
-    try {
-      await supabase
-        .from('profiles')
-        .update({ 
-          is_online: isOnline, 
-          last_seen: new Date().toISOString() 
-        })
-        .eq('user_id', user.id);
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour du statut:', error);
-    }
-  }, [user]);
+    const enrichedDevices: BluetoothDevice[] = devices.map(device => {
+      const contact = contacts.find(c => c.userId === device.userId);
+      
+      return {
+        id: device.id,
+        userId: device.userId,
+        username: contact?.username || device.name.toLowerCase().replace(/\s+/g, '_'),
+        displayName: contact?.displayName || device.name,
+        avatarUrl: contact?.avatarUrl,
+        signalStrength: device.signalStrength,
+        isNearby: device.isNearby,
+        bluetoothId: device.bluetoothId
+      };
+    });
+
+    setNearbyDevices(enrichedDevices);
+    setSavedContacts(getSavedContacts());
+  };
 
   const enableBluetooth = async () => {
     try {
       setIsBluetoothEnabled(true);
-      await updateOnlineStatus(true);
       
       if (user) {
         meshManagerRef.current = getMeshManager(user.id);
@@ -166,7 +149,7 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setIsScanning(true);
           try {
             const devices = await meshManagerRef.current.scanForDevices();
-            await enrichDevicesWithProfiles(devices);
+            enrichDevicesFromLocal(devices);
           } finally {
             setIsScanning(false);
           }
@@ -175,13 +158,16 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await performScan();
         
         if (!autoScanIntervalRef.current) {
-          autoScanIntervalRef.current = setInterval(performScan, 15000);
+          autoScanIntervalRef.current = setInterval(() => {
+            performScan();
+            setCarriedMessagesCount(getCarriedMessages().length);
+          }, 5000);
         }
       }
       
       toast({
         title: "Bluetooth activé",
-        description: "Recherche automatique des appareils activée.",
+        description: "Recherche des appareils à proximité...",
       });
     } catch (error) {
       toast({
@@ -200,8 +186,6 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     
     setIsBluetoothEnabled(false);
     setIsScanning(false);
-    setNearbyDevices([]);
-    await updateOnlineStatus(false);
     await stopMeshManager();
     meshManagerRef.current = null;
     
@@ -224,7 +208,7 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       
       const discoveredDevices = await meshManagerRef.current.scanForDevices();
-      await enrichDevicesWithProfiles(discoveredDevices);
+      enrichDevicesFromLocal(discoveredDevices);
     } catch (error) {
       console.error('Erreur lors du scan:', error);
     } finally {
@@ -241,6 +225,13 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return meshManagerRef.current.isUserNearby(userId);
     }
     return nearbyDevices.some(d => d.userId === userId && d.isNearby);
+  };
+
+  const getMyBluetoothId = (): string => {
+    if (meshManagerRef.current) {
+      return meshManagerRef.current.getBluetoothId();
+    }
+    return '';
   };
 
   // Cleanup on unmount
@@ -260,11 +251,13 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isScanning,
         nearbyDevices,
         savedContacts,
+        carriedMessagesCount,
         enableBluetooth,
         disableBluetooth,
         startScanning,
         stopScanning,
         isUserNearby,
+        getMyBluetoothId,
       }}
     >
       {children}
