@@ -73,6 +73,7 @@ export interface SavedContact {
   displayName: string;
   avatarUrl?: string;
   lastSeen: string;
+  bluetoothId?: string;
 }
 
 // Get saved contacts

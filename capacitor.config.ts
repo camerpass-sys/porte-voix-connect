@@ -1,17 +1,14 @@
-import type { CapacitorConfig } from '@anthropic/capacitor-types';
+import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.connktus.bluetooth',
   appName: 'ConnKtus',
   webDir: 'dist',
-  server: {
-    url: 'https://7df9d7d6-04e4-4a9f-9b90-c6d83728e8bb.lovableproject.com?forceHideBadge=true',
-    cleartext: true
-  },
+  // No server URL - APK will load bundled app for offline use
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: true
+    webContentsDebuggingEnabled: false
   },
   ios: {
     contentInset: 'automatic',
