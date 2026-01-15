@@ -79,8 +79,7 @@ export const useMessages = (conversationId: string | null) => {
 
     setMessages(prev => [...prev, newMessage]);
 
-    // Get recipient ID from conversation participants
-    // For now, we'll extract from conversationId pattern or use mesh manager
+    // Get mesh manager
     const meshManager = getMeshManager(user.id);
     
     // Save message locally
@@ -96,17 +95,10 @@ export const useMessages = (conversationId: string | null) => {
     
     saveMessageLocally(offlineMessage);
 
-    // Try to send via mesh network (Bluetooth only)
-    try {
-      // The mesh manager will handle delivery when recipient is nearby
-      // or relay through carrier devices
-      console.log(`[Messages] Message ${messageId} en attente de livraison Bluetooth`);
-      
-      return true;
-    } catch (error) {
-      console.error('[Messages] Erreur envoi:', error);
-      return false;
-    }
+    // Message will be delivered when recipient is nearby or via carrier
+    console.log(`[Messages] Message ${messageId} en attente de livraison Bluetooth`);
+    
+    return true;
   };
 
   // Listen for incoming messages via Bluetooth mesh

@@ -1,10 +1,18 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { generateBluetoothId } from '@/services/BluetoothMeshService';
+
+// Offline user structure (no Supabase dependency)
+export interface OfflineUser {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl?: string;
+  bluetoothId: string;
+  createdAt: string;
+}
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: OfflineUser | null;
   loading: boolean;
   signUp: (username: string, password: string, displayName: string) => Promise<{ error: Error | null }>;
   signIn: (username: string, password: string) => Promise<{ error: Error | null }>;
@@ -13,88 +21,147 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Convert username to fake email for Supabase Auth
-const usernameToEmail = (username: string) => `${username.toLowerCase().trim()}@connktus.local`;
+// Storage keys for offline auth
+const USERS_KEY = 'connktus_users';
+const CURRENT_USER_KEY = 'connktus_current_user';
+const SESSION_KEY = 'connktus_session';
+
+// Get stored users from localStorage
+const getStoredUsers = (): { [username: string]: { password: string; user: OfflineUser } } => {
+  try {
+    const stored = localStorage.getItem(USERS_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+};
+
+// Save users to localStorage
+const saveUsers = (users: { [username: string]: { password: string; user: OfflineUser } }): void => {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+};
+
+// Simple hash function for password (basic protection for local storage)
+const hashPassword = (password: string): string => {
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const char = password.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<OfflineUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Check for existing session on mount
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    const checkSession = () => {
+      try {
+        const storedUser = localStorage.getItem(CURRENT_USER_KEY);
+        const session = localStorage.getItem(SESSION_KEY);
+        
+        if (storedUser && session) {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+        }
+      } catch (error) {
+        console.error('[Auth] Erreur session:', error);
+      } finally {
         setLoading(false);
       }
-    );
+    };
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    checkSession();
   }, []);
 
   const signUp = async (username: string, password: string, displayName: string) => {
-    const email = usernameToEmail(username);
-    const redirectUrl = `${window.location.origin}/`;
-    
-    // Check if username is already taken
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('username', username.toLowerCase().trim())
-      .maybeSingle();
-    
-    if (existingProfile) {
-      return { error: new Error("Ce nom d'utilisateur est déjà pris") };
-    }
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          username: username.toLowerCase().trim(),
-          display_name: displayName,
-        }
+    try {
+      const normalizedUsername = username.toLowerCase().trim();
+      const users = getStoredUsers();
+      
+      // Check if username already exists
+      if (users[normalizedUsername]) {
+        return { error: new Error("Ce nom d'utilisateur est déjà pris") };
       }
-    });
-    
-    return { error: error as Error | null };
+
+      // Create new user
+      const userId = crypto.randomUUID();
+      const bluetoothId = generateBluetoothId();
+      
+      const newUser: OfflineUser = {
+        id: userId,
+        username: normalizedUsername,
+        displayName: displayName.trim(),
+        bluetoothId,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Save user with hashed password
+      users[normalizedUsername] = {
+        password: hashPassword(password),
+        user: newUser,
+      };
+      
+      saveUsers(users);
+      
+      // Auto sign-in after signup
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
+      localStorage.setItem(SESSION_KEY, crypto.randomUUID());
+      
+      setUser(newUser);
+      
+      console.log('[Auth] Inscription réussie:', normalizedUsername);
+      
+      return { error: null };
+    } catch (error) {
+      console.error('[Auth] Erreur inscription:', error);
+      return { error: error as Error };
+    }
   };
 
   const signIn = async (username: string, password: string) => {
-    const email = usernameToEmail(username);
-    
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    return { error: error as Error | null };
+    try {
+      const normalizedUsername = username.toLowerCase().trim();
+      const users = getStoredUsers();
+      
+      const storedUser = users[normalizedUsername];
+      
+      if (!storedUser) {
+        return { error: new Error("Nom d'utilisateur ou mot de passe incorrect") };
+      }
+
+      // Check password
+      if (storedUser.password !== hashPassword(password)) {
+        return { error: new Error("Nom d'utilisateur ou mot de passe incorrect") };
+      }
+
+      // Set session
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(storedUser.user));
+      localStorage.setItem(SESSION_KEY, crypto.randomUUID());
+      
+      setUser(storedUser.user);
+      
+      console.log('[Auth] Connexion réussie:', normalizedUsername);
+      
+      return { error: null };
+    } catch (error) {
+      console.error('[Auth] Erreur connexion:', error);
+      return { error: error as Error };
+    }
   };
 
   const signOut = async () => {
-    // Update online status before signing out
-    if (user) {
-      await supabase
-        .from('profiles')
-        .update({ is_online: false, last_seen: new Date().toISOString() })
-        .eq('user_id', user.id);
-    }
-    await supabase.auth.signOut();
+    localStorage.removeItem(CURRENT_USER_KEY);
+    localStorage.removeItem(SESSION_KEY);
+    setUser(null);
+    console.log('[Auth] Déconnexion réussie');
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
