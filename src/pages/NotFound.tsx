@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Home, Bluetooth } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import logoImage from '@/assets/logo.jpg';
+import logoImage from '@/assets/logo.png';
 
 const NotFound: React.FC = () => {
   const navigate = useNavigate();
