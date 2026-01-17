@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, User, Lock, UserPlus } from 'lucide-react';
 import { z } from 'zod';
-import logoImage from '@/assets/logo.jpg';
+import logoImage from '@/assets/logo.png';
 
 const loginSchema = z.object({
   username: z.string()
