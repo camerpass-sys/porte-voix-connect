@@ -122,14 +122,13 @@ export const AuthPage: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom">
       {/* Header with gradient */}
       <div className="flex-shrink-0 pt-10 pb-8 px-6 text-center" style={{ background: 'var(--gradient-primary)' }}>
-        <div className="w-28 h-28 mx-auto mb-4 rounded-2xl overflow-hidden shadow-xl bg-white p-2">
+        <div className="w-64 h-20 mx-auto mb-4 flex items-center justify-center">
           <img 
             src={logoImage} 
             alt="ConnKtus" 
-            className="w-full h-full object-contain"
+            className="max-w-full max-h-full object-contain drop-shadow-xl"
           />
         </div>
-        <h1 className="text-3xl font-bold text-primary-foreground">ConnKtus</h1>
         <p className="text-primary-foreground/80 text-sm mt-2">
           Messagerie Bluetooth • Sans Internet
         </p>

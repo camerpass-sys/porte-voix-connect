@@ -15,8 +15,8 @@ const NotFound: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6 text-center safe-area-top safe-area-bottom">
-      <div className="w-24 h-24 mb-6 rounded-2xl overflow-hidden shadow-lg bg-white p-2">
-        <img src={logoImage} alt="ConnKtus" className="w-full h-full object-contain" />
+      <div className="w-56 h-16 mb-6 flex items-center justify-center">
+        <img src={logoImage} alt="ConnKtus" className="max-w-full max-h-full object-contain drop-shadow-lg" />
       </div>
       
       <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">

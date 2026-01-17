@@ -105,8 +105,12 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenChat }) => {
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <header className="chat-header px-4 py-3 flex items-center justify-between safe-area-top">
-        <div className="flex items-center">
-          <img src={logoImage} alt="ConnKtus" className="h-10 object-contain" />
+        <div className="flex items-center h-12 py-1">
+          <img 
+            src={logoImage} 
+            alt="ConnKtus" 
+            className="h-full w-auto max-w-[180px] object-contain drop-shadow-lg" 
+          />
         </div>
 
         <div className="flex items-center gap-1">
